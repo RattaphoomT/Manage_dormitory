@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Button,
@@ -25,17 +25,10 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import { apiRequest } from './services/api';
 
 const roomStatuses = ['ว่าง', 'มีผู้เช่า', 'จอง', 'ซ่อม'];
 const roomTypes = ['Standard', 'Deluxe', 'Suite'];
-
-const initialRows = [
-  { id: 1, name: '101', building: 'อาคาร A', floor: 1, type: 'Standard', status: 'มีผู้เช่า', price: 3500, tenant: 'สมศักดิ์ ใจดี' },
-  { id: 2, name: '102', building: 'อาคาร A', floor: 1, type: 'Standard', status: 'ว่าง', price: 3500, tenant: '-' },
-  { id: 3, name: '201', building: 'อาคาร A', floor: 2, type: 'Deluxe', status: 'มีผู้เช่า', price: 5000, tenant: 'มาลี มีสุข' },
-  { id: 4, name: '202', building: 'อาคาร A', floor: 2, type: 'Deluxe', status: 'ซ่อม', price: 5000, tenant: '-' },
-  { id: 5, name: '301', building: 'อาคาร B', floor: 3, type: 'Suite', status: 'จอง', price: 7200, tenant: 'รอยืนยันสัญญา' },
-];
 
 const emptyRoom = { id: null, name: '', building: 'อาคาร A', floor: 1, type: 'Standard', status: 'ว่าง', price: '', tenant: '-' };
 
@@ -47,11 +40,30 @@ const statusColor = {
 };
 
 export default function Rooms() {
-  const [rooms, setRooms] = useState(initialRows);
+  const [rooms, setRooms] = useState([]);
   const [open, setOpen] = useState(false);
   const [currentRoom, setCurrentRoom] = useState(emptyRoom);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const isEditing = currentRoom.id !== null;
+
+  const fetchRooms = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const data = await apiRequest('/rooms');
+      setRooms(data);
+    } catch (fetchError) {
+      setError(fetchError.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRooms();
+  }, []);
 
   const handleClickOpen = () => {
     setCurrentRoom(emptyRoom);
@@ -65,7 +77,7 @@ export default function Rooms() {
 
   const handleClose = () => setOpen(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const normalizedRoom = {
       ...currentRoom,
       floor: Number(currentRoom.floor),
@@ -73,18 +85,33 @@ export default function Rooms() {
       tenant: currentRoom.tenant || '-',
     };
 
-    if (isEditing) {
-      setRooms(rooms.map((room) => (room.id === currentRoom.id ? normalizedRoom : room)));
-    } else {
-      const newId = rooms.length ? Math.max(...rooms.map((room) => room.id)) + 1 : 1;
-      setRooms([...rooms, { ...normalizedRoom, id: newId }]);
+    try {
+      if (isEditing) {
+        await apiRequest(`/rooms/${currentRoom.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(normalizedRoom),
+        });
+      } else {
+        await apiRequest('/rooms', {
+          method: 'POST',
+          body: JSON.stringify(normalizedRoom),
+        });
+      }
+      await fetchRooms();
+      handleClose();
+    } catch (saveError) {
+      setError(saveError.message);
     }
-    handleClose();
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบห้องนี้?')) {
-      setRooms(rooms.filter((room) => room.id !== id));
+      try {
+        await apiRequest(`/rooms/${id}`, { method: 'DELETE' });
+        await fetchRooms();
+      } catch (deleteError) {
+        setError(deleteError.message);
+      }
     }
   };
 
@@ -111,20 +138,26 @@ export default function Rooms() {
         </Button>
       </Stack>
 
+      {error && (
+        <Paper variant="outlined" sx={{ p: 2, mb: 2, borderColor: 'error.light', bgcolor: 'error.light' }}>
+          <Typography color="error.main">{error}</Typography>
+        </Paper>
+      )}
+
       <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="body2" color="text.secondary">มีผู้เช่า</Typography>
             <Typography variant="h5" sx={{ fontWeight: 800 }}>{occupied}</Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="body2" color="text.secondary">ห้องว่าง</Typography>
             <Typography variant="h5" sx={{ fontWeight: 800 }}>{available}</Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="body2" color="text.secondary">ซ่อมบำรุง</Typography>
             <Typography variant="h5" sx={{ fontWeight: 800 }}>{maintenance}</Typography>
@@ -146,7 +179,12 @@ export default function Rooms() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {rooms.map((row) => (
+            {loading && (
+              <TableRow>
+                <TableCell colSpan={7} align="center">กำลังโหลดข้อมูล...</TableCell>
+              </TableRow>
+            )}
+            {!loading && rooms.map((row) => (
               <TableRow key={row.id} hover>
                 <TableCell sx={{ fontWeight: 700 }}>{row.name}</TableCell>
                 <TableCell>{row.building} / ชั้น {row.floor}</TableCell>
@@ -178,33 +216,33 @@ export default function Rooms() {
         <DialogTitle sx={{ fontWeight: 800 }}>{isEditing ? 'แก้ไขข้อมูลห้องพัก' : 'เพิ่มห้องพักใหม่'}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ pt: 1 }}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField label="หมายเลขห้อง" name="name" value={currentRoom.name} onChange={handleFormChange} fullWidth />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField label="อาคาร" name="building" value={currentRoom.building} onChange={handleFormChange} fullWidth />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField label="ชั้น" name="floor" type="number" value={currentRoom.floor} onChange={handleFormChange} fullWidth />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField select label="ประเภทห้อง" name="type" value={currentRoom.type} onChange={handleFormChange} fullWidth>
                 {roomTypes.map((type) => (
                   <MenuItem key={type} value={type}>{type}</MenuItem>
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField select label="สถานะ" name="status" value={currentRoom.status} onChange={handleFormChange} fullWidth>
                 {roomStatuses.map((status) => (
                   <MenuItem key={status} value={status}>{status}</MenuItem>
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField label="ราคา/เดือน" name="price" type="number" value={currentRoom.price} onChange={handleFormChange} fullWidth />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <TextField label="ผู้เช่าปัจจุบัน" name="tenant" value={currentRoom.tenant} onChange={handleFormChange} fullWidth />
             </Grid>
           </Grid>

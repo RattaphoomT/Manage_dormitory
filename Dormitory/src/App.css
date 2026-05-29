@@ -2,6 +2,15 @@
   white-space: nowrap;
 }
 
+.MuiPaper-root {
+  width: 100%;
+}
+
+.MuiTableContainer-root {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .MuiDialog-paper {
   border-radius: 12px;
 }

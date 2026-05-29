@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Button,
@@ -25,12 +25,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-
-const initialRows = [
-  { id: 'T-1001', name: 'สมศักดิ์ ใจดี', room: '101', phone: '081-234-5678', contractEnd: '2569-12-31', status: 'พักอาศัย', balance: 0 },
-  { id: 'T-1002', name: 'มาลี มีสุข', room: '201', phone: '082-345-6789', contractEnd: '2569-08-31', status: 'พักอาศัย', balance: 1200 },
-  { id: 'T-1003', name: 'จอห์น โด', room: '301', phone: '083-456-7890', contractEnd: '2569-06-30', status: 'จอง', balance: 0 },
-];
+import { apiRequest } from './services/api';
 
 const emptyStudent = {
   id: null,
@@ -50,11 +45,30 @@ const statusColor = {
 };
 
 export default function Students() {
-  const [students, setStudents] = useState(initialRows);
+  const [students, setStudents] = useState([]);
   const [open, setOpen] = useState(false);
   const [currentStudent, setCurrentStudent] = useState(emptyStudent);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const isEditing = currentStudent.id !== null;
+
+  const fetchStudents = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const data = await apiRequest('/tenants');
+      setStudents(data);
+    } catch (fetchError) {
+      setError(fetchError.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStudents();
+  }, []);
 
   const handleClickOpen = () => {
     setCurrentStudent(emptyStudent);
@@ -68,24 +82,39 @@ export default function Students() {
 
   const handleClose = () => setOpen(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const normalizedStudent = {
       ...currentStudent,
       balance: Number(currentStudent.balance || 0),
     };
 
-    if (isEditing) {
-      setStudents(students.map((student) => (student.id === currentStudent.id ? normalizedStudent : student)));
-    } else {
-      const newId = `T-${Math.floor(1000 + Math.random() * 9000)}`;
-      setStudents([...students, { ...normalizedStudent, id: newId }]);
+    try {
+      if (isEditing) {
+        await apiRequest(`/tenants/${currentStudent.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(normalizedStudent),
+        });
+      } else {
+        await apiRequest('/tenants', {
+          method: 'POST',
+          body: JSON.stringify(normalizedStudent),
+        });
+      }
+      await fetchStudents();
+      handleClose();
+    } catch (saveError) {
+      setError(saveError.message);
     }
-    handleClose();
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลผู้พักอาศัยนี้?')) {
-      setStudents(students.filter((student) => student.id !== id));
+  const handleDelete = async (id) => {
+    if (window.confirm('ยืนยันการย้ายออก/ปิดสถานะผู้พักอาศัยนี้?')) {
+      try {
+        await apiRequest(`/tenants/${id}`, { method: 'DELETE' });
+        await fetchStudents();
+      } catch (deleteError) {
+        setError(deleteError.message);
+      }
     }
   };
 
@@ -112,20 +141,26 @@ export default function Students() {
         </Button>
       </Stack>
 
+      {error && (
+        <Paper variant="outlined" sx={{ p: 2, mb: 2, borderColor: 'error.light', bgcolor: 'error.light' }}>
+          <Typography color="error.main">{error}</Typography>
+        </Paper>
+      )}
+
       <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="body2" color="text.secondary">ผู้พักอาศัยปัจจุบัน</Typography>
             <Typography variant="h5" sx={{ fontWeight: 800 }}>{activeTenants}</Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="body2" color="text.secondary">แจ้งย้ายออก</Typography>
             <Typography variant="h5" sx={{ fontWeight: 800 }}>{pendingMoveOut}</Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="body2" color="text.secondary">ยอดค้างรวม</Typography>
             <Typography variant="h5" sx={{ fontWeight: 800 }}>{totalBalance.toLocaleString()} บาท</Typography>
@@ -148,7 +183,12 @@ export default function Students() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {students.map((row) => (
+            {loading && (
+              <TableRow>
+                <TableCell colSpan={8} align="center">กำลังโหลดข้อมูล...</TableCell>
+              </TableRow>
+            )}
+            {!loading && students.map((row) => (
               <TableRow key={row.id} hover>
                 <TableCell sx={{ fontWeight: 700 }}>{row.id}</TableCell>
                 <TableCell>{row.name}</TableCell>
@@ -183,26 +223,26 @@ export default function Students() {
         <DialogTitle sx={{ fontWeight: 800 }}>{isEditing ? 'แก้ไขข้อมูลผู้พักอาศัย' : 'เพิ่มผู้พักอาศัยใหม่'}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ pt: 1 }}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField label="ชื่อ-สกุล" name="name" value={currentStudent.name} onChange={handleFormChange} fullWidth autoFocus />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField label="ห้องพัก" name="room" value={currentStudent.room} onChange={handleFormChange} fullWidth />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField label="เบอร์โทรศัพท์" name="phone" value={currentStudent.phone} onChange={handleFormChange} fullWidth />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField label="วันหมดสัญญา" name="contractEnd" value={currentStudent.contractEnd} onChange={handleFormChange} fullWidth placeholder="2569-12-31" />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField select label="สถานะ" name="status" value={currentStudent.status} onChange={handleFormChange} fullWidth>
                 {Object.keys(statusColor).map((status) => (
                   <MenuItem key={status} value={status}>{status}</MenuItem>
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField label="ยอดค้างชำระ" name="balance" type="number" value={currentStudent.balance} onChange={handleFormChange} fullWidth />
             </Grid>
           </Grid>

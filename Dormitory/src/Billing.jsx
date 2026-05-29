@@ -53,25 +53,25 @@ export default function Billing() {
       </Stack>
 
       <Grid container spacing={2.5}>
-        <Grid item xs={12} lg={5}>
+        <Grid size={{ xs: 12, lg: 5 }}>
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>มิเตอร์น้ำ/ไฟ</Typography>
             <Stack spacing={2}>
               {meters.map((item) => (
                 <Grid container spacing={1.5} key={item.room}>
-                  <Grid item xs={12}>
+                  <Grid size={{ xs: 12 }}>
                     <Typography sx={{ fontWeight: 700 }}>ห้อง {item.room}</Typography>
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
                     <TextField label="น้ำครั้งก่อน" value={item.waterLast} size="small" fullWidth />
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
                     <TextField label="น้ำปัจจุบัน" value={item.waterNow} size="small" fullWidth />
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
                     <TextField label="ไฟครั้งก่อน" value={item.electricLast} size="small" fullWidth />
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
                     <TextField label="ไฟปัจจุบัน" value={item.electricNow} size="small" fullWidth />
                   </Grid>
                 </Grid>
@@ -80,7 +80,7 @@ export default function Billing() {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} lg={7}>
+        <Grid size={{ xs: 12, lg: 7 }}>
           <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
             <Table sx={{ minWidth: 760 }}>
               <TableHead sx={{ backgroundColor: 'grey.100' }}>

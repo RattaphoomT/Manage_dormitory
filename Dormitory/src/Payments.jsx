@@ -50,19 +50,19 @@ export default function Payments() {
       </Stack>
 
       <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="body2" color="text.secondary">รับชำระรวม</Typography>
             <Typography variant="h5" sx={{ fontWeight: 800 }}>{totalPaid.toLocaleString()} บาท</Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="body2" color="text.secondary">รอตรวจสลิป</Typography>
             <Typography variant="h5" sx={{ fontWeight: 800 }}>{pending}</Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="body2" color="text.secondary">ช่องทางหลัก</Typography>
             <Typography variant="h5" sx={{ fontWeight: 800 }}>PromptPay</Typography>

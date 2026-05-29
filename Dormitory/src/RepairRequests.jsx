@@ -53,7 +53,7 @@ export default function RepairRequests() {
 
       <Grid container spacing={2} sx={{ mb: 2 }}>
         {['ใหม่', 'กำลังซ่อม', 'เสร็จแล้ว'].map((status) => (
-          <Grid item xs={12} sm={4} key={status}>
+          <Grid size={{ xs: 12, sm: 4 }} key={status}>
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
               <Typography variant="body2" color="text.secondary">{status}</Typography>
               <Typography variant="h5" sx={{ fontWeight: 800 }}>

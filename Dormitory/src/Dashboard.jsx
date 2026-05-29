@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Avatar,
   Box,
@@ -22,28 +22,7 @@ import PaidIcon from '@mui/icons-material/Paid';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import BuildIcon from '@mui/icons-material/Build';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-
-const stats = [
-  { title: 'ห้องทั้งหมด', value: '50', detail: '3 อาคาร / 5 ชั้น', icon: <ApartmentIcon />, color: '#2563eb' },
-  { title: 'ห้องว่าง', value: '7', detail: 'พร้อมปล่อยเช่า 5 ห้อง', icon: <MeetingRoomIcon />, color: '#16a34a' },
-  { title: 'ผู้พักอาศัย', value: '82', detail: 'สัญญาใกล้หมด 4 ราย', icon: <PeopleIcon />, color: '#7c3aed' },
-  { title: 'รายได้เดือนนี้', value: '154,800', detail: 'เก็บแล้ว 87%', icon: <PaidIcon />, color: '#ea580c' },
-];
-
-const revenue = [
-  { month: 'ม.ค.', amount: 122000 },
-  { month: 'ก.พ.', amount: 136000 },
-  { month: 'มี.ค.', amount: 129000 },
-  { month: 'เม.ย.', amount: 148500 },
-  { month: 'พ.ค.', amount: 154800 },
-  { month: 'มิ.ย.', amount: 151200 },
-];
-
-const alerts = [
-  { title: 'ใบแจ้งหนี้ค้างชำระ', subtitle: '12 รายการ รวม 38,400 บาท', icon: <ReceiptLongIcon />, color: 'warning' },
-  { title: 'งานซ่อมรอดำเนินการ', subtitle: '5 รายการ ต้องมอบหมายช่าง', icon: <BuildIcon />, color: 'info' },
-  { title: 'สัญญาเช่าใกล้หมดอายุ', subtitle: '4 ราย ภายใน 30 วัน', icon: <WarningAmberIcon />, color: 'error' },
-];
+import { apiRequest } from './services/api';
 
 function StatCard({ item }) {
   return (
@@ -69,7 +48,46 @@ function StatCard({ item }) {
 }
 
 export default function Dashboard() {
-  const maxRevenue = Math.max(...revenue.map((item) => item.amount));
+  const [summary, setSummary] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function fetchDashboard() {
+      try {
+        const data = await apiRequest('/dashboard');
+        setSummary(data);
+      } catch (fetchError) {
+        setError(fetchError.message);
+      }
+    }
+
+    fetchDashboard();
+  }, []);
+
+  const stats = useMemo(() => {
+    const rooms = summary?.rooms || {};
+    const tenants = summary?.tenants || {};
+    const invoices = summary?.invoices || {};
+    const contracts = summary?.contracts || {};
+
+    return [
+      { title: 'ห้องทั้งหมด', value: rooms.totalRooms || 0, detail: `มีผู้เช่า ${rooms.occupiedRooms || 0} ห้อง`, icon: <ApartmentIcon />, color: '#2563eb' },
+      { title: 'ห้องว่าง', value: rooms.availableRooms || 0, detail: `ซ่อมบำรุง ${rooms.maintenanceRooms || 0} ห้อง`, icon: <MeetingRoomIcon />, color: '#16a34a' },
+      { title: 'ผู้พักอาศัย', value: tenants.totalTenants || 0, detail: `สัญญาใกล้หมด ${contracts.expiringContracts || 0} ราย`, icon: <PeopleIcon />, color: '#7c3aed' },
+      { title: 'ยอดบิลเดือนนี้', value: Number(invoices.invoiceTotal || 0).toLocaleString(), detail: `ค้างชำระ ${Number(invoices.outstandingTotal || 0).toLocaleString()} บาท`, icon: <PaidIcon />, color: '#ea580c' },
+    ];
+  }, [summary]);
+
+  const revenue = summary?.revenue?.length ? summary.revenue : [{ month: 'ยังไม่มีข้อมูล', amount: 0 }];
+  const maxRevenue = Math.max(1, ...revenue.map((item) => Number(item.amount)));
+  const occupiedRooms = summary?.rooms?.occupiedRooms || 0;
+  const totalRooms = summary?.rooms?.totalRooms || 0;
+  const occupancyRate = totalRooms ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
+  const alerts = [
+    { title: 'ใบแจ้งหนี้ค้างชำระ', subtitle: `${Number(summary?.invoices?.outstandingTotal || 0).toLocaleString()} บาท`, icon: <ReceiptLongIcon />, color: 'warning' },
+    { title: 'งานซ่อมรอดำเนินการ', subtitle: `${summary?.repairs?.openRepairRequests || 0} รายการ`, icon: <BuildIcon />, color: 'info' },
+    { title: 'สัญญาเช่าใกล้หมดอายุ', subtitle: `${summary?.contracts?.expiringContracts || 0} ราย ภายใน 30 วัน`, icon: <WarningAmberIcon />, color: 'error' },
+  ];
 
   return (
     <Box>
@@ -83,16 +101,22 @@ export default function Dashboard() {
         <Chip label="รอบบิลปัจจุบัน: มิถุนายน 2569" color="primary" sx={{ alignSelf: { xs: 'flex-start', md: 'center' } }} />
       </Stack>
 
+      {error && (
+        <Paper variant="outlined" sx={{ p: 2, mb: 2, borderColor: 'error.light', bgcolor: 'error.light' }}>
+          <Typography color="error.main">{error}</Typography>
+        </Paper>
+      )}
+
       <Grid container spacing={2.5}>
         {stats.map((item) => (
-          <Grid item xs={12} sm={6} lg={3} key={item.title}>
+          <Grid size={{ xs: 12, sm: 6, lg: 3 }} key={item.title}>
             <StatCard item={item} />
           </Grid>
         ))}
       </Grid>
 
       <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
-        <Grid item xs={12} lg={8}>
+        <Grid size={{ xs: 12, lg: 8 }}>
           <Paper sx={{ p: 3, borderRadius: 2, height: '100%' }}>
             <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1} sx={{ mb: 3 }}>
               <Box>
@@ -103,7 +127,7 @@ export default function Dashboard() {
                   ค่าเช่า ค่าน้ำ ค่าไฟ และค่าบริการอื่น
                 </Typography>
               </Box>
-              <Chip label="เฉลี่ย 140,250 บาท/เดือน" variant="outlined" />
+              <Chip label="ข้อมูลจากการชำระเงินที่ตรวจแล้ว" variant="outlined" />
             </Stack>
             <Stack direction="row" spacing={2} alignItems="end" sx={{ height: 260 }}>
               {revenue.map((item) => (
@@ -112,13 +136,13 @@ export default function Dashboard() {
                     sx={{
                       width: '100%',
                       maxWidth: 54,
-                      height: `${Math.max(30, (item.amount / maxRevenue) * 210)}px`,
+                      height: `${Math.max(30, (Number(item.amount) / maxRevenue) * 210)}px`,
                       bgcolor: 'primary.main',
                       borderRadius: '6px 6px 2px 2px',
                     }}
                   />
                   <Typography variant="caption" color="text.secondary">
-                    {item.month}
+                    {item.month?.slice(5) || item.month}
                   </Typography>
                 </Stack>
               ))}
@@ -126,7 +150,7 @@ export default function Dashboard() {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} lg={4}>
+        <Grid size={{ xs: 12, lg: 4 }}>
           <Paper sx={{ p: 3, borderRadius: 2, height: '100%' }}>
             <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>
               งานที่ต้องติดตาม
@@ -144,7 +168,7 @@ export default function Dashboard() {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Paper sx={{ p: 3, borderRadius: 2 }}>
             <Stack spacing={2}>
               <Box>
@@ -152,21 +176,21 @@ export default function Dashboard() {
                   อัตราเข้าพัก
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  43 จาก 50 ห้องมีผู้เช่า
+                  {occupiedRooms} จาก {totalRooms} ห้องมีผู้เช่า
                 </Typography>
               </Box>
-              <LinearProgress variant="determinate" value={86} sx={{ height: 10, borderRadius: 5 }} />
+              <LinearProgress variant="determinate" value={occupancyRate} sx={{ height: 10, borderRadius: 5 }} />
               <Stack direction="row" justifyContent="space-between">
-                <Typography variant="body2">ว่าง 7 ห้อง</Typography>
+                <Typography variant="body2">ว่าง {summary?.rooms?.availableRooms || 0} ห้อง</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                  86%
+                  {occupancyRate}%
                 </Typography>
               </Stack>
             </Stack>
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Paper sx={{ p: 3, borderRadius: 2 }}>
             <Stack spacing={1.5}>
               <Typography variant="h6" sx={{ fontWeight: 800 }}>
@@ -174,15 +198,15 @@ export default function Dashboard() {
               </Typography>
               <Stack direction="row" justifyContent="space-between">
                 <Typography color="text.secondary">ออกใบแจ้งหนี้แล้ว</Typography>
-                <Typography sx={{ fontWeight: 700 }}>50 ใบ</Typography>
+                <Typography sx={{ fontWeight: 700 }}>{Number(summary?.invoices?.invoiceTotal || 0).toLocaleString()} บาท</Typography>
               </Stack>
               <Stack direction="row" justifyContent="space-between">
-                <Typography color="text.secondary">ชำระแล้ว</Typography>
-                <Typography sx={{ fontWeight: 700 }}>43 ใบ</Typography>
+                <Typography color="text.secondary">ค้างชำระ</Typography>
+                <Typography sx={{ fontWeight: 700 }}>{Number(summary?.invoices?.outstandingTotal || 0).toLocaleString()} บาท</Typography>
               </Stack>
               <Stack direction="row" justifyContent="space-between">
-                <Typography color="text.secondary">รอตรวจสลิป</Typography>
-                <Typography sx={{ fontWeight: 700 }}>5 ใบ</Typography>
+                <Typography color="text.secondary">งานซ่อมเปิดอยู่</Typography>
+                <Typography sx={{ fontWeight: 700 }}>{summary?.repairs?.openRepairRequests || 0} งาน</Typography>
               </Stack>
             </Stack>
           </Paper>
